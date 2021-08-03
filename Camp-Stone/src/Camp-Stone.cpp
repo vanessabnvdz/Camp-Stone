@@ -160,17 +160,13 @@ void readFlame () {
   if (FLAMESENSOR == HIGH) {
     digitalWrite (REDLEDPIN, HIGH); 
     digitalWrite (GREENLEDPIN, LOW);
-    display.setCursor(0,0);
-    display.clearDisplay();
-    display.printf("FIRE IS NOT OUT!\n", FLAMESENSOR);
-    display.display();
+  
   }
   else {
     digitalWrite (GREENLEDPIN, HIGH); 
     digitalWrite (REDLEDPIN, LOW);
-    display.setCursor(0,0);
-    display.clearDisplay();
-    display.printf("FIRE IS OUT:)\n", FLAMESENSOR);
-    display.display();
+  
+
+    Serial.printf ("Flame reading is, %i\n",sensorReading); 
   }
 }

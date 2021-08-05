@@ -29,15 +29,11 @@ Adafruit_BME280 bme;
 #define OLED_RESET 4
 #define SCREEN_ADDRESS 0x3c
 #define BME_ADDRESS 0x76
-float tempC;
-float pressPA;
-float humidRH;
 Adafruit_SSD1306 display(OLED_RESET);
 
 //Air Quality Sensor
 #include "Air_Quality_Sensor.h"
 AirQualitySensor sensor (A1);
-int current_quality;
 
 //Ambient Light Sensor
 const int LIGHTSENSOR = A3; 
@@ -49,14 +45,23 @@ const int LIGHTSENSOR = A3;
 #define PIXEL_COUNT 60
 #define PIXEL_TYPE WS2812B
 int i; 
-const int BRI = 15;
+const int BRI = 30;
 Adafruit_NeoPixel pixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 //FlameSensor
-const int FLAMESENSOR = A0;
+const int FLAMESENSOR = A1;
 const int GREENLEDPIN = D5;
 const int REDLEDPIN = D4;
-int sensorReading; 
+
+//MQTT
+TCPClient TheClient; 
+Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
+Adafruit_MQTT_Publish mqttpublishTemperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/tempc");
+Adafruit_MQTT_Publish mqttpublishPressure = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pressPA");
+Adafruit_MQTT_Publish mqttpublishHumidity = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humidRH");
+Adafruit_MQTT_Publish mqttpublishMoisture = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/moistureread");
+Adafruit_MQTT_Subscribe mqttwaterpump = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/waterpump");
+  
 
 
 
@@ -92,6 +97,10 @@ void setup() {
   pinMode (FLAMESENSOR, INPUT);
   pinMode(GREENLEDPIN, OUTPUT); 
   pinMode(REDLEDPIN, OUTPUT);
+
+//MQTT 
+  WiFi.connect();
+ 
 }
 
 void loop() {
@@ -108,9 +117,9 @@ void loop() {
 
 
 void bmeDisplayed () {
-  tempC = bme.readTemperature();
-  pressPA = bme.readPressure();
-  humidRH = bme.readHumidity();
+  float tempC = bme.readTemperature();
+  float pressPA = bme.readPressure();
+  float humidRH = bme.readHumidity();
 
   display.setCursor(0,0);
   display.clearDisplay();
@@ -121,7 +130,7 @@ void bmeDisplayed () {
 }
 
 void readAirquality () {
-  current_quality=sensor.slope();
+int current_quality=sensor.slope();
     if (current_quality >= 0)
     {
     if (current_quality==0)
@@ -136,13 +145,13 @@ void readAirquality () {
 }
 
 void readLight () {
-  float reading = analogRead (LIGHTSENSOR); 
-  float square_ratio = reading/ 1023.0; 
+float reading = analogRead (LIGHTSENSOR); 
+float square_ratio = reading/ 1023.0; 
   square_ratio = pow(square_ratio, 2.0);
   Serial.printf ("Light level is %02f\n", reading); 
   delay (1000); 
 
-    if (reading<150) {
+    if (reading<130) {
       for (i=0; i<60; i++) {
       pixel.setPixelColor(i, 0xFFFF00);
       pixel.setBrightness(BRI);
@@ -156,17 +165,14 @@ void readLight () {
 }
 
 void readFlame () {
-  sensorReading = analogRead (FLAMESENSOR); 
-  if (FLAMESENSOR == HIGH) {
-    digitalWrite (REDLEDPIN, HIGH); 
-    digitalWrite (GREENLEDPIN, LOW);
-  
-  }
-  else {
-    digitalWrite (GREENLEDPIN, HIGH); 
-    digitalWrite (REDLEDPIN, LOW);
-  
-
-    Serial.printf ("Flame reading is, %i\n",sensorReading); 
-  }
+int sensorReading = analogRead (FLAMESENSOR); 
+    if (sensorReading<3497) {
+      digitalWrite (REDLEDPIN, HIGH); 
+      digitalWrite (GREENLEDPIN, LOW);
+    }
+    else {
+      digitalWrite (GREENLEDPIN, HIGH); 
+      digitalWrite (REDLEDPIN, LOW);
+  Serial.printf ("Flame reading is %i\n", sensorReading); 
+    }
 }

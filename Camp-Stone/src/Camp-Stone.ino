@@ -8,6 +8,10 @@
 //BME
 #include "Adafruit_BME280.h"
 Adafruit_BME280 bme;
+float tempC;
+float tempF;
+float pressPA;
+float humidRH; 
 
 //OLED
 #include "Adafruit_SSD1306.h"
@@ -21,6 +25,7 @@ Adafruit_SSD1306 display(OLED_RESET);
 //Air Quality Sensor
 #include "Air_Quality_Sensor.h"
 AirQualitySensor sensor (A1);
+int current_quality; 
 
 //Ambient Light Sensor
 const int LIGHTSENSOR = A3; 
@@ -39,19 +44,22 @@ Adafruit_NeoPixel pixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 const int FLAMESENSOR = A1;
 const int GREENLEDPIN = D5;
 const int REDLEDPIN = D4;
+int sensorReading;
 
 //MQTT
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h" 
+#include "Adafruit_MQTT/Adafruit_MQTT.h" 
+#include "credentials.h"
+int lastTime; 
 TCPClient TheClient; 
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
-Adafruit_MQTT_Publish mqttpublishTemperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/tempc");
-Adafruit_MQTT_Publish mqttpublishPressure = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pressPA");
-Adafruit_MQTT_Publish mqttpublishHumidity = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humidRH");
-Adafruit_MQTT_Publish mqttpublishMoisture = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/moistureread");
-Adafruit_MQTT_Subscribe mqttwaterpump = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/waterpump");
+Adafruit_MQTT_Publish mqttpublishTemperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/temperature");
+Adafruit_MQTT_Publish mqttpublishPressure = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pressure");
+Adafruit_MQTT_Publish mqttpublishHumidity = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humidity");
+Adafruit_MQTT_Publish mqttpublishAirQuality = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/airquality");
+Adafruit_MQTT_Publish mqttpublisFlameSensor = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/flamesensor");
   
-
-
-
 
 void setup() {
   Serial.begin(9600);
@@ -87,7 +95,7 @@ void setup() {
 
 //MQTT 
   WiFi.connect();
- 
+  
 }
 
 void loop() {
@@ -100,13 +108,16 @@ void loop() {
 
   readFlame(); 
 
+  MQTT_connect();
+
 }
 
-
 void bmeDisplayed () {
-  float tempC = bme.readTemperature();
-  float pressPA = bme.readPressure();
-  float humidRH = bme.readHumidity();
+  tempC = bme.readTemperature();
+  pressPA = bme.readPressure();
+  humidRH = bme.readHumidity();
+
+  tempF = (tempC * 1.8) + 32;
 
   display.setCursor(0,0);
   display.clearDisplay();
@@ -117,7 +128,7 @@ void bmeDisplayed () {
 }
 
 void readAirquality () {
-int current_quality=sensor.slope();
+current_quality=sensor.slope();
     if (current_quality >= 0)
     {
     if (current_quality==0)
@@ -152,7 +163,7 @@ float square_ratio = reading/ 1023.0;
 }
 
 void readFlame () {
-int sensorReading = analogRead (FLAMESENSOR); 
+sensorReading = analogRead (FLAMESENSOR); 
     if (sensorReading<3497) {
       digitalWrite (REDLEDPIN, HIGH); 
       digitalWrite (GREENLEDPIN, LOW);
@@ -162,4 +173,36 @@ int sensorReading = analogRead (FLAMESENSOR);
       digitalWrite (REDLEDPIN, LOW);
   Serial.printf ("Flame reading is %i\n", sensorReading); 
     }
+}
+
+void MQTT_connect() {
+ int8_t ret;
+ 
+  if (mqtt.connected()) {
+    return;
+  }
+ Serial.print("Connecting to MQTT... ");
+  while ((ret = mqtt.connect()) != 0) {
+       Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
+       Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+       mqtt.disconnect();
+       delay(5000);  
+  }
+  Serial.printf("MQTT Connected!\n");
+
+  if((millis()-lastTime > 30000)) {
+    if(mqtt.Update()) {
+  mqttpublishTemperature.publish(tempF);
+  Serial.printf("Publishing %0.2f \n", tempF);
+  mqttpublishPressure.publish(pressPA); 
+  Serial.printf("Publishing %0.2f \n", pressPA);
+  mqttpublishHumidity.publish(humidRH); 
+  Serial.printf("Publishing %0.2f \n", humidRH);
+  mqttpublishAirQuality.publish(current_quality); 
+  Serial.printf("Publishing %i \n", current_quality);
+  mqttpublisFlameSensor.publish(sensorReading); 
+  Serial.printf("Publishing %i \n", sensorReading);
+    } 
+ lastTime = millis();
+  }
 }

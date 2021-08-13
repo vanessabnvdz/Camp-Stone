@@ -13,14 +13,14 @@
 
 void setup();
 void loop();
-void bmeDisplayed ();
-void readAirquality ();
-void readLight ();
-void readFlame ();
+void bmeDisplayed();
+void readAirquality();
+void readLight();
+void readFlame();
 void MQTT_connect();
-void publishValues ();
+void publishValues();
 #line 8 "c:/Users/russell/Documents/iot/Camp-Stone/Camp-Stone/src/Camp-Stone.ino"
-SYSTEM_MODE (SEMI_AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 //BME
 #include "Adafruit_BME280.h"
@@ -28,7 +28,7 @@ Adafruit_BME280 bme;
 float tempC;
 float tempF;
 float pressPA;
-float humidRH; 
+float humidRH;
 
 //OLED
 #include "Adafruit_SSD1306.h"
@@ -41,11 +41,11 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 //Air Quality Sensor
 #include "Air_Quality_Sensor.h"
-AirQualitySensor sensor (A1);
-int current_quality; 
+AirQualitySensor sensor(A2);
+int current_quality;
 
 //Ambient Light Sensor
-const int LIGHTSENSOR = A3; 
+const int LIGHTSENSOR = A3;
 
 //Neopixels
 #include "neopixel.h"
@@ -53,7 +53,7 @@ const int LIGHTSENSOR = A3;
 #define PIXEL_PIN D7
 #define PIXEL_COUNT 60
 #define PIXEL_TYPE WS2812B
-int i; 
+int i;
 const int BRI = 30;
 Adafruit_NeoPixel pixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
@@ -65,30 +65,30 @@ int sensorReading;
 
 //MQTT
 #include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h" 
-#include "Adafruit_MQTT/Adafruit_MQTT.h" 
+#include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
+#include "Adafruit_MQTT/Adafruit_MQTT.h"
 #include "credentials.h"
-int lastTime; 
-TCPClient TheClient; 
-Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
+int lastTime;
+int lastTime2;
+int lastTime3;
+TCPClient TheClient;
+Adafruit_MQTT_SPARK mqtt(&TheClient, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 Adafruit_MQTT_Publish mqttpublishTemperature = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/temperature");
 Adafruit_MQTT_Publish mqttpublishPressure = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pressure");
 Adafruit_MQTT_Publish mqttpublishHumidity = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humidity");
 Adafruit_MQTT_Publish mqttpublishAirQuality = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/airquality");
 Adafruit_MQTT_Publish mqttpublishFlameSensor = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/flamesensor");
-  
 
-void setup() {
+void setup()
+{
 
+  Serial.begin(9600);
 
-
-Serial.begin(9600);
-
-//BME
+  //BME
   Serial.begin(9600);
   bme.begin(0x76);
- 
- //OLED 
+
+  //OLED
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
   display.display();
   delay(5000);
@@ -97,51 +97,52 @@ Serial.begin(9600);
   display.setTextColor(WHITE);
   display.display();
 
- //AirQuality
+  //AirQuality
   sensor.init();
 
-//AmbientLightSensor 
-  pinMode (LIGHTSENSOR, INPUT);
+  //AmbientLightSensor
+  pinMode(LIGHTSENSOR, INPUT);
 
-//Neopixel
+  //Neopixel
   pixel.begin();
   pixel.clear();
   pixel.show();
 
-//FlameSensor
-  pinMode (FLAMESENSOR, INPUT);
-  pinMode(GREENLEDPIN, OUTPUT); 
+  //FlameSensor
+  pinMode(FLAMESENSOR, INPUT);
+  pinMode(GREENLEDPIN, OUTPUT);
   pinMode(REDLEDPIN, OUTPUT);
 
-//MQTT 
- WiFi.connect();
-  
+  //MQTT
+  WiFi.connect();
 }
 
-void loop() {
+void loop()
+{
 
-  bmeDisplayed(); 
+  bmeDisplayed();
 
-  readAirquality(); 
+  readAirquality();
 
-  readLight(); 
+  readLight();
 
-  readFlame(); 
+  readFlame();
 
   MQTT_connect();
-  
-  publishValues(); 
 
+  publishValues();
 }
 
-void bmeDisplayed () {
+//turns on BME and displays readings on OLED 
+void bmeDisplayed()
+{
   tempC = bme.readTemperature();
   pressPA = bme.readPressure();
   humidRH = bme.readHumidity();
 
   tempF = (tempC * 1.8) + 32;
 
-  display.setCursor(0,0);
+  display.setCursor(0, 0);
   display.clearDisplay();
   display.printf("Temp is %0.1f\n", tempC);
   display.printf("Pressure is %0.1f\n", pressPA);
@@ -149,85 +150,117 @@ void bmeDisplayed () {
   display.display();
 }
 
-void readAirquality () {
-  current_quality=sensor.slope();
-    if (current_quality >= 0)
-    {
-    if (current_quality==0)
+//read air quality values 
+void readAirquality()
+{
+  current_quality = sensor.slope();
+  if (current_quality >= 0)
+  {
+    if (current_quality == 0)
       Serial.println("High pollution! Force signal active");
-    else if (current_quality==1)
-       Serial.println("High pollution!");
-    else if (current_quality==2)
-       Serial.println("Low pollution!");
-    else if (current_quality==3)
-       Serial.println("Fresh air!");
-    }
+    else if (current_quality == 1)
+      Serial.println("High pollution!");
+    else if (current_quality == 2)
+      Serial.println("Low pollution!");
+    else if (current_quality == 3)
+      Serial.println("Fresh air!");
+  }
 }
 
-void readLight () {
-  float reading = analogRead (LIGHTSENSOR); 
-  float square_ratio = reading/ 1023.0; 
+//ambient light sensor reads light and turns on pixels
+void readLight()
+{
+  float reading = analogRead(LIGHTSENSOR);
+  float square_ratio = reading / 1023.0;
   square_ratio = pow(square_ratio, 2.0);
-  Serial.printf ("Light level is %02f\n", reading); 
-  delay (1000); 
+  Serial.printf("Light level is %02f\n", reading);
+  delay(1000);
 
-    if (reading<130) {
-      for (i=0; i<60; i++) {
+  if (reading < 130)
+  {
+    for (i = 0; i < 60; i++)
+    {
       pixel.setPixelColor(i, 0xFFFF00);
       pixel.setBrightness(BRI);
       pixel.show();
-      }
-    } 
-    else {
-      pixel.clear(); 
-      pixel.show();
     }
+  }
+  else
+  {
+    pixel.clear();
+    pixel.show();
+  }
 }
 
-void readFlame () {
-  sensorReading = analogRead (FLAMESENSOR); 
-    if (sensorReading<3497) {
-      digitalWrite (REDLEDPIN, HIGH); 
-      digitalWrite (GREENLEDPIN, LOW);
-    }
-    else {
-      digitalWrite (GREENLEDPIN, HIGH); 
-      digitalWrite (REDLEDPIN, LOW);
-  Serial.printf ("Flame reading is %i\n", sensorReading); 
-    }
+//reads flame reading turns on LEDs according if fire is on or off 
+void readFlame()
+{
+  sensorReading = analogRead(FLAMESENSOR);
+  if (sensorReading < 3497)
+  {
+    digitalWrite(REDLEDPIN, HIGH);
+    digitalWrite(GREENLEDPIN, LOW);
+  }
+  else
+  {
+    digitalWrite(GREENLEDPIN, HIGH);
+    digitalWrite(REDLEDPIN, LOW);
+    Serial.printf("Flame reading is %i\n", sensorReading);
+  }
 }
 
-void MQTT_connect() {
+//connects MQTT
+void MQTT_connect()
+{
   int8_t ret;
-    if (mqtt.connected()) {
-     return;
-    }
-      Serial.print("Connecting to MQTT... ");
-      while ((ret = mqtt.connect()) != 0) {
-      Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
-      Serial.printf("Retrying MQTT connection in 5 seconds..\n");
-      mqtt.disconnect();
-      delay(5000);  
-      }
-      Serial.printf("MQTT Connected!\n");
+  if (mqtt.connected())
+  {
+    return;
+  }
+  Serial.print("Connecting to MQTT... ");
+  while ((ret = mqtt.connect()) != 0)
+  {
+    Serial.printf("%s\n", (char *)mqtt.connectErrorString(ret));
+    Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+    mqtt.disconnect();
+    delay(5000);
+  }
+  Serial.printf("MQTT Connected!\n");
 }
 
-  
+//publishes values to cloud 
+void publishValues()
+{
+  if ((millis() - lastTime2 > 1000))
+  {
+    if (mqtt.Update())
+    {
+      mqttpublishFlameSensor.publish(sensorReading);
+      Serial.printf("Publishing %i \n", sensorReading);
+    }
+    lastTime2 = millis();
+  }
+  if ((millis() - lastTime3 > 3000))
+  {
+    if (mqtt.Update())
+    {
+      mqttpublishAirQuality.publish(current_quality);
+      Serial.printf("Publishing %i \n", current_quality);
+    }
+    lastTime3 = millis();
+  }
 
-void publishValues () {
-  if((millis()-lastTime > 10000)) {
-    if(mqtt.Update()) {
+  if ((millis() - lastTime > 60000))
+  {
+    if (mqtt.Update())
+    {
       mqttpublishTemperature.publish(tempF);
       Serial.printf("Publishing %0.2f \n", tempF);
-      mqttpublishPressure.publish(pressPA); 
+      mqttpublishPressure.publish(pressPA);
       Serial.printf("Publishing %0.2f \n", pressPA);
-      mqttpublishHumidity.publish(humidRH); 
+      mqttpublishHumidity.publish(humidRH);
       Serial.printf("Publishing %0.2f \n", humidRH);
-      mqttpublishAirQuality.publish(current_quality); 
-      Serial.printf("Publishing %i \n", current_quality);
-      mqttpublishFlameSensor.publish(sensorReading); 
-      Serial.printf("Publishing %i \n", sensorReading);
-     } 
- lastTime = millis();
+    }
+    lastTime = millis();
   }
 }
